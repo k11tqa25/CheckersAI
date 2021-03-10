@@ -1,4 +1,6 @@
 from operator import sub, add
+import json
+from json import JSONEncoder
 
 
 class Game:
@@ -34,7 +36,7 @@ class Game:
                 for c, item in enumerate(line.strip()):
                     if item != ".":
                         color = 'w' if item == "w" or item == "W" else 'b'
-                        position = (r, c)
+                        position = (7 - r, c)
                         is_king = item == "W" or item == "B"
                         token = Token(color, position, is_king)
                         self.board[position] = token
@@ -70,19 +72,22 @@ class Player:
         availabilities.
         """
         # append all arcs for the token
-        for corner in token.four_corners:
+        for corner in token.front + token.back:
             if corner in self.board:
                 token.arc_set.add(self.board[corner])
         # check for available moves and jump
         for move in token.available_moves:
-            if move in self.board:
-                tkn = self.board[move]
+            landing = token.get_landing(move)
+            if landing in self.board:
+                tkn = self.board[landing]
                 if tkn.color == token.color:
                     # remove from available moves if it get blocked
                     token.available_moves.remove(move)
                 else:
                     # if there is no other pieces blocking its jump...
-                    if not tuple(map(add, move, move)) in self.board:
+                    jump_landing = token.get_landing(tuple(map(add, move, move)))
+                    if jump_landing not in self.board:
+                        print(jump_landing)
                         token.read_to_jump = 1
 
     def get_available_tokens(self):
@@ -105,11 +110,11 @@ class Token:
     def __init__(self, color, pos, is_king=False):
         self.color = color      # "b" or "w"
         self.position = pos     # (0, 0) ~ (7, 7) where x = rows, y = cols
+        self.readable_position = self.to_checker_position()
         self.is_king = is_king
         # The front and back of the white pieces
         self.front = [(1, 1), (1, -1)]   # upper-right, upper-left
         self.back = [(-1, 1), (-1, -1)]  # bottom-right, bottom-left
-        self.four_corners = self.front.extend(self.back)
         if color == 'b':
             self.__swap_back_and_front()
         if is_king:
@@ -118,9 +123,9 @@ class Token:
         self.read_to_jump = 0           # if there's any opponent's tokes in the attacking area, mark this as 1
         self.available_moves = self.front
         if pos[1] == 0:
-            self.available_moves = self.front[0]
+            self.available_moves = [self.front[0]]
         elif pos[1] == 7:
-            self.available_moves = self.front[1]
+            self.available_moves = [self.front[1]]
 
         self.arc_set = {}      # The set of tokens that is blocked by this token
 
@@ -131,6 +136,14 @@ class Token:
         temp = self.front
         self.front = self.back
         self.back = temp
+
+    def get_landing(self, move):
+        """
+        Get the landing position of the token given a move.
+        :param move: A move. e.g., (1, 1) (1,-1)...
+        :return: Landing position.
+        """
+        return self.position[0] + move[0], self.position[1] + move[1]
 
     def to_checker_position(self):
         """
@@ -144,7 +157,20 @@ class Token:
                f"Available Moves: {self.available_moves}"
 
 
+class ObjectEncoder(JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Token):
+            return o.__dict__
+        else:
+            return json.JSONEncoder.default(self, o)
+
+
 if __name__ == '__main__':
     game = Game("input1.txt")
+    with open('debug.json', 'w') as f:
+        json.dump(list(map(ObjectEncoder().encode, game.player_b.jump_available_tokens)), f)
+
+    for token in game.player_w.move_available_tokens:
+        print(token.to_checker_position(), token.available_moves)
 
 
