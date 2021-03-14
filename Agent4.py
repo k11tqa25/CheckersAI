@@ -1,4 +1,4 @@
-# Aggressive
+# Protected
 
 import json
 from json import JSONEncoder
@@ -144,10 +144,10 @@ class Game:
         self.player = self.player_w if self.my_color == 'w' else self.player_b
         global MAX_DEPTH
         if len(self.board) <= 6:
-            MAX_DEPTH = 8
+            MAX_DEPTH = 7
         # if len(self.board) <= 15:
         #     MAX_DEPTH = 7
-        if float(self.time_left) < 15.0:
+        if float(self.time_left) < 10.0:
             MAX_DEPTH = 3
 
     def __read_board(self, filename):
@@ -426,6 +426,10 @@ class Player:
                 # No moves means losing
                 number_of_moves = -1000
             for t in player.tokens:
+                protection -= 1
+                for arc in t.arc_set:
+                    if player.board[arc].color == t.color:
+                        protection += 0.5
                 if t.read_to_jump:
                     jump_reward += max(map(len, t.jump_path)) * 3
                 if t.is_king:

@@ -58,8 +58,11 @@ def read_player_input(input):
             if t.position == start:
                 valid = True
         if not valid:
-            print(f"Invalid Piece at {commands[0]}")
+            print(Back.RED + f"Invalid Piece at {commands[0]}")
             return False
+        if (first[0] + first[1]) % 2 != 0:
+            print(Back.RED + f"You can't go to {commands[1]}")
+        need_to_jump = len(com.player.opponent.jump_available_tokens) > 0
         if len(commands) > 2 or abs(start[0] - first[0]) > 1 or abs(start[1] - first[1]) > 1:
             # Jump
             path = []
@@ -68,6 +71,9 @@ def read_player_input(input):
             token = com.board[start]
             com.player.opponent.jump(token, path)
         else:
+            if need_to_jump:
+                print(Back.RED + f"Invalid Move. You need to make a jump.")
+                return False
             token = com.board[start]
             move = Agent.tuple_operation(first, start, 's')
             com.player.opponent.single_move(token, move)
@@ -119,56 +125,60 @@ def initialize():
         TOTAL_TIME = float(f.readline().strip())
 
 
-initialize()
+def run():
+    initialize()
+    global TOTAL_TIME
+
+    Name = input("Welcome! Type in your name and start:")
+    print("Type q or Q to quit the game.")
+    cmd = ""
+    stop = False
+    states = ["agent", "player", "check"]
+    if AGENT_COLOR == "WHITE":
+        state = states[0]
+    else:
+        state = states[1]
+    agent_turn = True
+    has_move = True
+
+    while not stop:
+        if state == states[0]:
+            display_board()
+            if AGENT_COLOR == "BLACK":
+                print(Fore.BLUE + f"(Agent) is making a move...")
+            else:
+                print(Fore.GREEN + f"(Agent) is making a move...")
+            agent_time_spent = Agent.run(GAME_FILE, RESULT_FILE)
+            TOTAL_TIME = TOTAL_TIME - agent_time_spent
+            if TOTAL_TIME > 0:
+                has_move = read_agent_result()
+                agent_turn = False
+            state = states[2]
+        elif state == states[1]:
+            display_board()
+            if AGENT_COLOR == "BLACK":
+                print(Fore.GREEN + f"({Name}) makes a move:")
+            else:
+                print(Fore.BLUE + f"({Name}) makes a move:")
+            cmd = input()
+            if cmd == 'q' or cmd == "Q":
+                stop = True
+            else:
+                if read_player_input(cmd):
+                    Agent.to_agent_board(GAME_FILE, com.board, AGENT_COLOR, TOTAL_TIME)
+                    agent_turn = True
+                    state = states[2]
+                else:
+                    state = states[1]
+
+        elif state == states[2]:
+            if check_wining(TOTAL_TIME, has_move):
+                display_board()
+                stop = True
+            else:
+                state = states[0] if agent_turn else states[1]
+
+# if __name__ == '__main__':
 
 com = Agent.Game(GAME_FILE)
-
-Name = input("Welcome! Type in your name and start:")
-print("Type q or Q to quit the game.")
-cmd = ""
-stop = False
-states = ["agent", "player", "check"]
-if AGENT_COLOR == "WHITE":
-    state = states[0]
-else:
-    state = states[1]
-agent_turn = True
-agent_time_spent = 0
-has_move = True
-
-while not stop:
-    if state == states[0]:
-        display_board()
-        if AGENT_COLOR == "BLACK":
-            print(Fore.BLUE + f"(Agent) is making a move...")
-        else:
-            print(Fore.GREEN + f"(Agent) is making a move...")
-        agent_time_spent = Agent.run(GAME_FILE, RESULT_FILE)
-        TOTAL_TIME = TOTAL_TIME - agent_time_spent
-        if TOTAL_TIME > 0:
-            has_move = read_agent_result()
-            agent_turn = False
-        state = states[2]
-    elif state == states[1]:
-        display_board()
-        if AGENT_COLOR == "BLACK":
-            print(Fore.GREEN + f"({Name}) makes a move:")
-        else:
-            print(Fore.BLUE + f"({Name}) makes a move:")
-        cmd = input()
-        if cmd == 'q' or cmd == "Q":
-            stop = True
-        else:
-            if read_player_input(cmd):
-                Agent.to_agent_board(GAME_FILE, com.board, AGENT_COLOR, TOTAL_TIME)
-                agent_turn = True
-                state = states[2]
-            else:
-                state = states[1]
-
-    elif state == states[2]:
-        if check_wining(TOTAL_TIME, has_move):
-            display_board()
-            stop = True
-        else:
-            state = states[0] if agent_turn else states[1]
+#     run()

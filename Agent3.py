@@ -1,12 +1,10 @@
-# Aggressive
+# Original one
 
 import json
 from json import JSONEncoder
 import time
 import copy
-import os
-
-MAX_DEPTH = 6
+MAX_DEPTH = 5
 time_spent = 0
 
 
@@ -36,9 +34,9 @@ def timeit(func):
 
 
 def apply_alg(player, is_max=True, depth=1, a=float('-inf'), b=float('inf')):
-    if depth == MAX_DEPTH + 1:
-        h = player.get_heuristic(depth) if depth % 2 == 1 else player.opponent.get_heuristic(depth)
-        save_boards(None, f"-- heuristic = {h}")
+    if depth == MAX_DEPTH:
+        h = player.get_heuristic() if depth % 2 == 1 else player.opponent.get_heuristic()
+        save_boards(player.board, f"-- heuristic = {h}")
         return h, {depth: (player.color, None, None, None)}
     v = float('-inf') if is_max else float('inf')
     best_move = {}
@@ -57,7 +55,7 @@ def apply_alg(player, is_max=True, depth=1, a=float('-inf'), b=float('inf')):
                     if v < v_next:
                         v = v_next
                         best_next_moves = next_moves
-                    if v > b:
+                    if v >= b:
                         best_move[depth] = (player.color, jt.readable_position, 'J', path)
                         best_move[depth + 1] = best_next_moves
                         return v, best_move
@@ -69,7 +67,7 @@ def apply_alg(player, is_max=True, depth=1, a=float('-inf'), b=float('inf')):
                     if v > v_next:
                         v = v_next
                         best_next_moves = next_moves
-                    if v < a:
+                    if v <= a:
                         best_move[depth] = (player.color, jt.readable_position, 'J', path)
                         best_move[depth + 1] = best_next_moves
                         return v, best_move
@@ -108,7 +106,7 @@ def apply_alg(player, is_max=True, depth=1, a=float('-inf'), b=float('inf')):
                         b = v
                         best_move[depth] = (player.color, mt.readable_position, 'M', move)
     else:
-        h = player.get_heuristic(depth) if depth % 2 == 1 else player.opponent.get_heuristic(depth)
+        h = player.get_heuristic() if depth % 2 == 1 else player.opponent.get_heuristic()
         save_boards(player.board, f"-- heuristic = {h}")
         return h, {depth: (player.color, None, None, None)}
 
@@ -143,11 +141,12 @@ class Game:
         self.player_b.opponent = self.player_w
         self.player = self.player_w if self.my_color == 'w' else self.player_b
         global MAX_DEPTH
-        if len(self.board) <= 6:
-            MAX_DEPTH = 8
-        # if len(self.board) <= 15:
-        #     MAX_DEPTH = 7
-        if float(self.time_left) < 15.0:
+        if 0 < len(self.player.jump_available_tokens) <= 3:
+            MAX_DEPTH = 7
+        elif len(self.player.jump_available_tokens) == 0\
+                and len(self.player.move_available_tokens) >= 5:
+            MAX_DEPTH = 4
+        if float(self.time_left) <= 30.0:
             MAX_DEPTH = 3
 
     def __read_board(self, filename):
@@ -192,8 +191,6 @@ class Game:
         i = 1
         while True:
             m = moves[i]
-            if type(m) != "tuple":
-                break
             p = display_player if m[0] == display_player.color else display_player.opponent
             for token in p.tokens:
                 if token.readable_position == m[1]:
@@ -202,7 +199,6 @@ class Game:
                     else:
                         p.single_move(token, m[3])
                     print_board(p.board)
-                    print(f"h = {display_player.get_heuristic(i)}")
                     break
             if i + 1 in moves:
                 moves = moves[i+1]
@@ -210,6 +206,8 @@ class Game:
             else:
                 break
         del display_player
+        print(f"h = {v}")
+
 
     def output_result(self, moves, filename):
         with open(filename, 'w') as f:
@@ -225,6 +223,7 @@ class Game:
                         f.write(f"J {chr(ord('a') + path[i-1][1])}{path[i-1][0] + 1} {chr(ord('a') + path[i][1])}{path[i][0] + 1}\n")
             else:
                 move = m[3]
+                print(m)
                 row = chr(ord(m[1][0]) + move[1])
                 col = int(m[1][1]) + move[0]
                 f.write(f"E {m[1]} {row}{col}\n")
@@ -408,38 +407,21 @@ class Player:
         self.place_a_token(token, landing)
         self.check_all_jump_tokens()
 
-    def get_heuristic(self, depth):
+    def get_heuristic(self):
         def heuristic(player):
             piece_count = len(player.tokens)
-            jump_reward = 0
             protection = 0
-            position_reward = 0
+            jump_reward = 0
             king = 0
-            number_of_moves = 0
-            if len(player.jump_available_tokens) != 0:
-                for t in player.jump_available_tokens:
-                    number_of_moves += len(t.jump_path) * 2
-            else:
-                for t in player.move_available_tokens:
-                    number_of_moves += len(t.available_moves)
-            if number_of_moves == 0:
-                # No moves means losing
-                number_of_moves = -1000
             for t in player.tokens:
+                for arc in t.arc_set:
+                    if player.board[arc].color == t.color:
+                        protection += 0.5
                 if t.read_to_jump:
                     jump_reward += max(map(len, t.jump_path)) * 3
                 if t.is_king:
-                    king += 10
-                else:
-                    # for not king
-                    if t.front[0][0] > 0:
-                        # if it's white
-                        position_reward += t.position[0] + 1
-                    else:
-                        # if it's black
-                        position_reward += -t.position[0] + 8
-
-            return piece_count + king + jump_reward + position_reward + number_of_moves + protection + depth
+                    king += 5
+            return piece_count + king + jump_reward + protection
         bonus = 0
         if len(self.opponent.tokens) == 0:
             bonus = 1000
@@ -540,17 +522,14 @@ class ObjectEncoder(JSONEncoder):
 def save_boards(board, title="", filename='ab_pruning.txt'):
     return
     with open(filename, 'a') as f:
-        if board is None:
-            f.write(title + "\n")
-        else:
-            b = [['.' for i in range(8)] for j in range(8)]
-            for key, value in board.items():
-                b[key[0]][key[1]] = value.color if not value.is_king else value.color.upper()
-            display = ""
-            b.reverse()
-            for row in b:
-                display += "".join(row) + '\n'
-            f.writelines([title + "\n", display])
+        b = [['.' for i in range(8)] for j in range(8)]
+        for key, value in board.items():
+            b[key[0]][key[1]] = value.color if not value.is_king else value.color.upper()
+        display = ""
+        b.reverse()
+        for row in b:
+            display += "".join(row) + '\n'
+        f.writelines([title + "\n", display])
 
 
 def to_agent_board(filename, board, color='WHITE', time=100.00):
@@ -581,17 +560,6 @@ def print_board(board, title=""):
 def run(input_filename, output_filename):
     game = Game(input_filename)
     v, moves = game.play()
-    print(f"The agent was thinking {MAX_DEPTH} steps ahead.")
     # game.display_result(v, moves)
     game.output_result(moves, output_filename)
     return time_spent
-
-#
-# if __name__ == '__main__':
-#     if os.path.isfile('ab_pruning.txt'):
-#         os.remove('ab_pruning.txt')
-#
-#     game = Game("GAME.txt")
-#     v, moves = game.play()
-#     game.display_result(v, moves)
-#     game.output_result(moves, "output.txt")
