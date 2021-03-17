@@ -1,6 +1,6 @@
 # Agent 1 will always go first
-import Agent4 as agent1
-import Agent2 as agent2
+import Homework as agent1
+import Agent4 as agent2
 from colorama import init   # To make the command line colorful
 from colorama import Fore, Back, Style
 import time
@@ -14,8 +14,8 @@ AGENT1_COLOR = "WHITE"
 AGENT2_COLOR = "BLACK"
 TOTAL_TIME1 = 100.0
 TOTAL_TIME2 = 100.0
-AGENT1_NAME = "protected agent"
-AGENT2_NAME = "aggressive agent"
+AGENT1_NAME = "protected1 agent"
+AGENT2_NAME = "homework agent"
 
 
 def initialize():
@@ -126,7 +126,8 @@ def run():
             display_board()
             print(Fore.GREEN + f"({AGENT1_NAME}) is making a move...{TOTAL_TIME1}")
             agent_time_spent = agent1.run(GAME_FILE, RESULT1_FILE)
-            TOTAL_TIME1 = TOTAL_TIME1 - agent_time_spent
+            if agent_time_spent:
+                TOTAL_TIME1 = TOTAL_TIME1 - agent_time_spent
             if TOTAL_TIME1 > 0:
                 has_move1 = read_agent_result(1)
                 agent1_turn = False
@@ -135,8 +136,10 @@ def run():
         elif state == states[1]:
             display_board()
             print(Fore.BLUE + f"({AGENT2_NAME}) is making a move...{TOTAL_TIME2}")
+
             agent_time_spent = agent2.run(GAME_FILE, RESULT2_FILE)
-            TOTAL_TIME2 = TOTAL_TIME2 - agent_time_spent
+            if agent_time_spent:
+                TOTAL_TIME2 = TOTAL_TIME2 - agent_time_spent
             if TOTAL_TIME2 > 0:
                 has_move2 = read_agent_result(2)
                 agent1_turn = True
